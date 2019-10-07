@@ -12,6 +12,8 @@ import edu.berkeley.cs186.database.memory.BufferManager;
 import edu.berkeley.cs186.database.memory.Page;
 import edu.berkeley.cs186.database.table.RecordId;
 
+import javax.xml.crypto.Data;
+
 /**
  * A leaf of a B+ tree. Every leaf in a B+ tree of order d stores between d and
  * 2d (key, record id) pairs and a pointer to its right sibling (i.e. the page
@@ -141,24 +143,29 @@ class LeafNode extends BPlusNode {
     @Override
     public LeafNode get(DataBox key) {
         // TODO(hw2): implement
-
-        return null;
+        return this;
     }
 
     // See BPlusNode.getLeftmostLeaf.
     @Override
     public LeafNode getLeftmostLeaf() {
         // TODO(hw2): implement
-
-        return null;
+        return this;
     }
 
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(hw2): implement
-
-        return Optional.empty();
+        if (keys.contains(key)) {
+            throw new BPlusTreeException("Key already exists in the B+ tree");
+        } else {
+            int insertLoc = InnerNode.numLessThanEqual(key, keys);
+            keys.add(insertLoc, key);
+            rids.add(insertLoc, rid);
+            sync();
+            return Optional.empty();
+        }
     }
 
     // See BPlusNode.bulkLoad.
@@ -166,7 +173,14 @@ class LeafNode extends BPlusNode {
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data,
             float fillFactor) {
         // TODO(hw2): implement
-
+        int d = metadata.getOrder();
+        int fillCap = (int) Math.ceil(2*d*fillFactor);
+        while (data.hasNext() && keys.size() <= fillCap) {
+            Pair<DataBox, RecordId> nextPair = data.next();
+            keys.add(nextPair.getFirst());
+            rids.add(nextPair.getSecond());
+        }
+        sync();
         return Optional.empty();
     }
 
@@ -174,8 +188,12 @@ class LeafNode extends BPlusNode {
     @Override
     public void remove(DataBox key) {
         // TODO(hw2): implement
-
-        return;
+        int index = keys.indexOf(key);
+        if (index != -1) {
+            keys.remove(index);
+            rids.remove(index);
+        }
+        sync();
     }
 
     // Iterators /////////////////////////////////////////////////////////////////
@@ -363,8 +381,21 @@ class LeafNode extends BPlusNode {
     public static LeafNode fromBytes(BPlusTreeMetadata metadata, BufferManager bufferManager,
                                      LockContext treeContext, long pageNum) {
         // TODO(hw2): implement
+        Page page = bufferManager.fetchPage(treeContext, pageNum, false);
+        Buffer buf = page.getBuffer();
 
-        return null;
+        assert (buf.get() == (byte) 1);
+
+        List<DataBox> keys = new ArrayList<>();
+        List<RecordId> rids = new ArrayList<>();
+        int n = buf.getInt();
+        for (int i = 0; i < n; ++i) {
+            keys.add(DataBox.fromBytes(buf, metadata.getKeySchema()));
+            rids.add(RecordId.fromBytes(buf));
+        }
+        Optional<Long> rightSibling = n == -1L ? Optional.empty() : Optional.of((long)Long.BYTES);
+
+        return new LeafNode(metadata, bufferManager, page, keys, rids, rightSibling, treeContext);
     }
 
     // Builtins //////////////////////////////////////////////////////////////////

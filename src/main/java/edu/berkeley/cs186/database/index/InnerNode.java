@@ -12,6 +12,8 @@ import edu.berkeley.cs186.database.memory.BufferManager;
 import edu.berkeley.cs186.database.memory.Page;
 import edu.berkeley.cs186.database.table.RecordId;
 
+import javax.xml.crypto.Data;
+
 /**
  * A inner node of a B+ tree. Every inner node in a B+ tree of order d stores
  * between d and 2d keys. An inner node with n keys stores n + 1 "pointers" to
@@ -79,8 +81,8 @@ class InnerNode extends BPlusNode {
     @Override
     public LeafNode get(DataBox key) {
         // TODO(hw2): implement
-
-        return null;
+        int childLoc = numLessThanEqual(key, keys);
+        return getChild(childLoc).get(key);
     }
 
     // See BPlusNode.getLeftmostLeaf.
@@ -88,16 +90,17 @@ class InnerNode extends BPlusNode {
     public LeafNode getLeftmostLeaf() {
         assert(children.size() > 0);
         // TODO(hw2): implement
-
-        return null;
+        return getChild(0).getLeftmostLeaf();
     }
 
     // See BPlusNode.put.
     @Override
     public Optional<Pair<DataBox, Long>> put(DataBox key, RecordId rid) {
         // TODO(hw2): implement
-
-        return Optional.empty();
+        int insertLoc = numLessThanEqual(key, keys);
+        Optional<Pair<DataBox, Long>> keyRidPair = getChild(insertLoc).put(key, rid);
+        sync();
+        return keyRidPair;
     }
 
     // See BPlusNode.bulkLoad.
@@ -105,7 +108,7 @@ class InnerNode extends BPlusNode {
     public Optional<Pair<DataBox, Long>> bulkLoad(Iterator<Pair<DataBox, RecordId>> data,
             float fillFactor) {
         // TODO(hw2): implement
-
+        sync();
         return Optional.empty();
     }
 
@@ -113,8 +116,8 @@ class InnerNode extends BPlusNode {
     @Override
     public void remove(DataBox key) {
         // TODO(hw2): implement
-
-        return;
+        get(key).remove(key);
+        sync();
     }
 
     // Helpers ///////////////////////////////////////////////////////////////////
