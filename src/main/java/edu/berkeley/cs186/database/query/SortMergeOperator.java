@@ -57,6 +57,24 @@ class SortMergeOperator extends JoinOperator {
         private SortMergeIterator() {
             super();
             // TODO(hw3_part1): implement
+            //sort left & right
+            String leftSortedTableName = new SortOperator(getTransaction(),getLeftTableName(),new LeftRecordComparator()).sort();
+            String rightSortedTableName = new SortOperator(getTransaction(),getRightTableName(),new RightRecordComparator()).sort();
+            leftIterator = SortMergeOperator.this.getRecordIterator(leftSortedTableName);
+            rightIterator = SortMergeOperator.this.getRecordIterator(rightSortedTableName);
+            leftRecord = leftIterator.hasNext() ? leftIterator.next() : null;
+            rightRecord = rightIterator.hasNext() ? rightIterator.next() : null;
+
+            //copied from SNLJOperator.java
+            // We mark the first record so we can reset to it when we advance the left record.
+            if (rightRecord != null) {
+                rightIterator.markPrev();
+            } else { return; }
+            try {
+               fetchNextRecord();
+            } catch (NoSuchElementException e) {
+                this.nextRecord = null;
+            }
         }
 
         /**
@@ -67,8 +85,67 @@ class SortMergeOperator extends JoinOperator {
         @Override
         public boolean hasNext() {
             // TODO(hw3_part1): implement
+            //copied from SNLJOperator.java
+            return this.nextRecord != null;
+        }
 
-            return false;
+        private void resetRightRecord() {
+            //copied from SNLJOperator.java
+            this.rightIterator.reset();
+            assert(rightIterator.hasNext());
+            rightRecord = rightIterator.next();
+        }
+
+        private int compareLeftToRightRecord() {
+            DataBox leftJoinValue = leftRecord.getValues().get(SortMergeOperator.this.getLeftColumnIndex());
+            DataBox rightJoinValue = rightRecord.getValues().get(SortMergeOperator.this.getRightColumnIndex());
+            return leftJoinValue.compareTo(rightJoinValue);
+        }
+
+        private Record joinRecords(Record leftRecord, Record rightRecord) {
+            List<DataBox> leftValues = new ArrayList<>(leftRecord.getValues());
+            List<DataBox> rightValues = new ArrayList<>(rightRecord.getValues());
+            leftValues.addAll(rightValues);
+            return new Record(leftValues);
+        }
+
+        private void leftRecordNullCheck() {
+            if (leftRecord == null) { throw new NoSuchElementException("No new record to fetch"); }
+        }
+        private void advanceLeftRecord() {
+            leftRecord = leftIterator.hasNext() ? leftIterator.next() : null;
+            leftRecordNullCheck();
+        }
+
+        private void advanceRightRecord() {
+            rightRecord = rightIterator.hasNext() ? rightIterator.next() : null;
+        }
+
+        private void fetchNextRecord() {
+            //copied some skeleton logic from SNLJOperator.java
+            leftRecordNullCheck();
+            nextRecord = null;
+            do {
+                if (rightRecord != null && !marked) {
+                    while (compareLeftToRightRecord() < 0) { //left < right
+                        advanceLeftRecord();
+                    }
+                    while (compareLeftToRightRecord() > 0) { //left > right
+                        advanceRightRecord();
+                    }
+                    marked = true;
+                    rightIterator.markPrev();
+                }
+                if (rightRecord != null && compareLeftToRightRecord() == 0) { //left == right
+                    nextRecord = joinRecords(leftRecord,rightRecord);
+                    advanceRightRecord();
+                }
+                else {
+                    resetRightRecord();
+                    advanceLeftRecord();
+                    marked = false;
+                }
+            } while (!hasNext());
         }
 
         /**
@@ -80,8 +157,18 @@ class SortMergeOperator extends JoinOperator {
         @Override
         public Record next() {
             // TODO(hw3_part1): implement
+            //copied from SNLJOperator.java
+            if (!this.hasNext()) {
+                throw new NoSuchElementException();
+            }
 
-            throw new NoSuchElementException();
+            Record nextRecord = this.nextRecord;
+            try {
+                this.fetchNextRecord();
+            } catch (NoSuchElementException e) {
+                this.nextRecord = null;
+            }
+            return nextRecord;
         }
 
         @Override
