@@ -62,6 +62,10 @@ class BNLJOperator extends JoinOperator {
         // The next record to return
         private Record nextRecord = null;
 
+        //---- my own fields
+        private Record rightRecord = null;
+        //----
+
         private BNLJIterator() {
             super();
 
@@ -89,6 +93,25 @@ class BNLJOperator extends JoinOperator {
          */
         private void fetchNextLeftBlock() {
             // TODO(hw3_part1): implement
+            do {
+                leftRecordIterator = getBlockIterator(getLeftTableName(),leftIterator,numBuffers-2);
+                if (leftRecordIterator.hasNext()) {
+                    leftRecord = leftRecordIterator.next();
+                } else {
+                    leftRecordIterator = null;
+                    leftRecord = null;
+                    break;
+                }
+            } while(!leftRecordIterator.hasNext());
+        }
+
+        private void setNextLeftRecord() {
+            if (leftRecordIterator != null && !leftRecordIterator.hasNext()) {
+                //left record set inside fetch call
+                fetchNextLeftBlock();
+            } else {
+                leftRecord = leftRecordIterator != null ? leftRecordIterator.next() : null;
+            }
         }
 
         /**
@@ -101,6 +124,30 @@ class BNLJOperator extends JoinOperator {
          */
         private void fetchNextRightPage() {
             // TODO(hw3_part1): implement
+            if(!leftRecordIterator.hasNext()) {
+                rightRecordIterator = null;
+            } else {
+                do {
+                    if (rightIterator.hasNext()) {
+                        rightRecordIterator = getBlockIterator(getRightTableName(), rightIterator, 1);
+                    } else {
+                        break;
+                    }
+                } while (!rightRecordIterator.hasNext());
+            }
+        }
+
+        private void setNextRightRecord() {
+            if (rightRecordIterator != null && !rightRecordIterator.hasNext()) {
+                fetchNextRightPage();
+            }
+            rightRecord = rightRecordIterator != null && rightRecordIterator.hasNext() ? rightRecordIterator.next() : null;
+        }
+
+        private void resetRightPage() {
+            this.rightIterator.reset();
+            assert(rightIterator.hasNext());
+            setNextRightRecord();
         }
 
         /**
@@ -111,6 +158,21 @@ class BNLJOperator extends JoinOperator {
          */
         private void fetchNextRecord() {
             // TODO(hw3_part1): implement
+            nextRecord = null;
+            do {
+                if (leftRecord == null) { throw new NoSuchElementException("No new record to fetch"); }
+                else if (rightRecord != null) {
+                    DataBox leftJoinValue = leftRecord.getValues().get(BNLJOperator.this.getLeftColumnIndex());
+                    DataBox rightJoinValue = rightRecord.getValues().get(BNLJOperator.this.getRightColumnIndex());
+                    if (leftJoinValue.equals(rightJoinValue)) {
+                        nextRecord = joinRecords(leftRecord,rightRecord);
+                    }
+                    setNextRightRecord();
+                } else {
+                    resetRightPage();
+                    setNextLeftRecord();
+                }
+            } while (!hasNext());
         }
 
         /**
