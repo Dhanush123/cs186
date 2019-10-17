@@ -66,7 +66,7 @@ class SortMergeOperator extends JoinOperator {
             rightRecord = rightIterator.hasNext() ? rightIterator.next() : null;
 
             //copied from SNLJOperator.java
-            // We mark the first record so we can reset to it when we advance the left record.
+            // "We mark the first record so we can reset to it when we advance the left record."
             if (rightRecord != null) {
                 rightIterator.markPrev();
             } else { return; }
@@ -122,7 +122,7 @@ class SortMergeOperator extends JoinOperator {
         }
 
         private void fetchNextRecord() {
-            //copied some skeleton logic from SNLJOperator.java
+            //copied a little skeleton logic from SNLJOperator.java
             leftRecordNullCheck();
             nextRecord = null;
             do {
