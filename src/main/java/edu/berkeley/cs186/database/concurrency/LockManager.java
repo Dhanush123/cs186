@@ -134,7 +134,6 @@ public class LockManager {
         // the entire lock manager when a transaction is blocked. You are also allowed to
         // move the synchronized block elsewhere if you wish.
         synchronized (this) {
-            return;
         }
     }
 
