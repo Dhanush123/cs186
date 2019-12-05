@@ -170,7 +170,7 @@ public class BufferManagerImpl implements BufferManager {
                     return;
                 }
                 if (!this.logPage) {
-                    recoveryManager.pageFlushHook(this.pageNum, this.getPageLSN());
+                    recoveryManager.pageFlushHook(this.getPageLSN());
                 }
                 BufferManagerImpl.this.diskSpaceManager.writePage(pageNum, contents);
                 BufferManagerImpl.this.incrementIOs();
@@ -313,7 +313,7 @@ public class BufferManagerImpl implements BufferManager {
             return ranges;
         }
 
-        private void setPageLSN(long pageLSN) {
+        void setPageLSN(long pageLSN) {
             ByteBuffer.wrap(this.contents).putLong(8, pageLSN);
         }
 
@@ -357,6 +357,9 @@ public class BufferManagerImpl implements BufferManager {
                     if (frame.isPinned()) {
                         throw new IllegalStateException("closing buffer manager but frame still pinned");
                     }
+                    if (!frame.isValid()) {
+                        continue;
+                    }
                     evictionPolicy.cleanup(frame);
                     frame.invalidate();
                 } finally {
@@ -375,6 +378,9 @@ public class BufferManagerImpl implements BufferManager {
         Frame evictedFrame;
         // figure out what frame to load data to, and update manager state
         try {
+            if (!this.diskSpaceManager.pageAllocated(pageNum)) {
+                throw new PageException("page " + pageNum + " not allocated");
+            }
             if (this.pageToFrame.containsKey(pageNum)) {
                 newFrame = this.frames[this.pageToFrame.get(pageNum)];
                 newFrame.pin();
