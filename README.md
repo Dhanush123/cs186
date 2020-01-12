@@ -419,4 +419,3 @@ db.close();
 
 More complex queries can be found in
 [`src/test/java/edu/berkeley/cs186/database/TestDatabase.java`](src/test/java/edu/berkeley/cs186/database/TestDatabase.java).
-
